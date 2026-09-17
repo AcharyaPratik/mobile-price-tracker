@@ -1,34 +1,37 @@
 x-airflow-common: &airflow-common
   build: .
   image: mobile-tracker-airflow:latest
+  user: "${AIRFLOW_UID:-50000}:0"
+  env_file:
+    - .env
   environment:
     AIRFLOW__CORE__EXECUTOR: LocalExecutor
     AIRFLOW__CORE__LOAD_EXAMPLES: "false"
     AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "false"
 
-    # Airflow's own metadata DB — points at the "postgres" service below
-    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://postgres:devpass@postgres:5432/airflow
+    # Airflow metadata DB — uses the same Postgres service as the tracker DB
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${DB_USER}:${DB_PASSWORD}@postgres:5432/airflow
 
-    # Shared secret so log streaming works across containers
     AIRFLOW__WEBSERVER__SECRET_KEY: "dev-shared-secret-key-please-change"
     AIRFLOW__WEBSERVER__WORKERS: "2"
     AIRFLOW__LOGGING__LOGGING_LEVEL: "INFO"
 
-    # Your scripts use these (tracker DB, also on the "postgres" service)
+    # Override host-side .env values — inside Docker the service is `postgres:5432`
     DB_HOST: postgres
     DB_PORT: "5432"
-    DB_NAME: mobile_tracker
-    DB_USER: postgres
-    DB_PASSWORD: devpass
-    PYTHONPATH: /opt/airflow/project/scripts
+    DB_NAME: ${DB_NAME}
+    DB_USER: ${DB_USER}
+    DB_PASSWORD: ${DB_PASSWORD}
 
+    PYTHONPATH: /opt/airflow/project/scripts
     PYTHONUNBUFFERED: "1"
-    
+
   volumes:
     - ./dags:/opt/airflow/dags
     - ./logs:/opt/airflow/logs
     - ./plugins:/opt/airflow/plugins
     - ./:/opt/airflow/project
+
   depends_on:
     postgres:
       condition: service_healthy
@@ -39,15 +42,16 @@ services:
     image: postgres:16
     container_name: mobile-tracker-postgres
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: devpass
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
     ports:
-      - "5433:5432"                 # host:container — 5433 avoids clashing with WSL's postgres on 5432
+      - "5433:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
-      - ./sql/init_databases.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./sql/init_databases.sql:/docker-entrypoint-initdb.d/00-init.sql
+      - ./sql/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER}"]
       interval: 5s
       timeout: 5s
       retries: 10

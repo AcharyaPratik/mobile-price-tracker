@@ -1,12 +1,8 @@
 FROM apache/airflow:2.9.3-python3.11
 
-USER airflow
-
-RUN pip install --no-cache-dir \
-    requests beautifulsoup4 pandas lxml \
-    psycopg2-binary python-dotenv playwright
-
 USER root
+
+# System libraries Playwright's Chromium needs
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libglib2.0-0 \
     libnss3 \
@@ -29,4 +25,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 USER airflow
+
+# Install Python deps from the pinned requirements file
+COPY requirements.txt /tmp/requirements.txt
+RUN pip install --no-cache-dir -r /tmp/requirements.txt
+
+# Download the Chromium binary Playwright drives
 RUN playwright install chromium
