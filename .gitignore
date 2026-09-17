@@ -1,0 +1,25 @@
+# Secrets
+.env
+
+# Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+
+# Airflow runtime
+logs/*
+!logs/.gitkeep
+plugins/*
+!plugins/.gitkeep
+
+# Generated data
+data/raw/*.csv
+data/raw/*.json
+data/processed/*.csv
+reports/*.csv
+
+# OS noise
+.DS_Store
+Thumbs.db

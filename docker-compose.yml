@@ -1,0 +1,94 @@
+x-airflow-common: &airflow-common
+  build: .
+  image: mobile-tracker-airflow:latest
+  environment:
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "false"
+
+    # Airflow's own metadata DB — points at the "postgres" service below
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://postgres:devpass@postgres:5432/airflow
+
+    # Shared secret so log streaming works across containers
+    AIRFLOW__WEBSERVER__SECRET_KEY: "dev-shared-secret-key-please-change"
+    AIRFLOW__WEBSERVER__WORKERS: "2"
+    AIRFLOW__LOGGING__LOGGING_LEVEL: "INFO"
+
+    # Your scripts use these (tracker DB, also on the "postgres" service)
+    DB_HOST: postgres
+    DB_PORT: "5432"
+    DB_NAME: mobile_tracker
+    DB_USER: postgres
+    DB_PASSWORD: devpass
+    PYTHONPATH: /opt/airflow/project/scripts
+
+    PYTHONUNBUFFERED: "1"
+    
+  volumes:
+    - ./dags:/opt/airflow/dags
+    - ./logs:/opt/airflow/logs
+    - ./plugins:/opt/airflow/plugins
+    - ./:/opt/airflow/project
+  depends_on:
+    postgres:
+      condition: service_healthy
+
+services:
+
+  postgres:
+    image: postgres:16
+    container_name: mobile-tracker-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: devpass
+    ports:
+      - "5433:5432"                 # host:container — 5433 avoids clashing with WSL's postgres on 5432
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./sql/init_databases.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  airflow-init:
+    <<: *airflow-common
+    container_name: airflow-init
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - |
+        airflow db migrate
+        airflow users create \
+          --username admin --password admin \
+          --firstname Admin --lastname User \
+          --role Admin --email admin@example.com
+        echo "✅ Airflow init complete"
+
+  airflow-webserver:
+    <<: *airflow-common
+    container_name: airflow-webserver
+    depends_on:
+      postgres:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+    ports:
+      - "8080:8080"
+    command: webserver
+    restart: unless-stopped
+
+  airflow-scheduler:
+    <<: *airflow-common
+    container_name: airflow-scheduler
+    depends_on:
+      postgres:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+    command: scheduler
+    restart: unless-stopped
+
+volumes:
+  pgdata:
