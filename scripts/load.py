@@ -27,7 +27,15 @@ df = pd.read_csv(CLEAN_PATH)
 with conn.cursor() as cur:
 
     print("Applying schema...")
-    cur.execute(SCHEMA_PATH.read_text())
+    schema_sql = SCHEMA_PATH.read_text()
+
+    # Strip psql meta-commands (lines starting with \) — psycopg2 can't parse them
+    schema_sql = "\n".join(
+        line for line in schema_sql.splitlines()
+        if not line.lstrip().startswith("\\")
+    )
+
+    cur.execute(schema_sql)
 
     records = [
         (
