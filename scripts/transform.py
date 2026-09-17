@@ -42,70 +42,51 @@ BRAND_MAP = {
 
 # ── name cleaning ────────────────────────────────────────────────
 
-def clean_name(name) -> str:
-    """Strip promotional junk from a product name."""
-    if name is None or (isinstance(name, float) and pd.isna(name)):
+def clean_name(name):
+    if pd.isna(name):
         return ""
-    s = str(name).strip()
-    if not s:
-        return ""
-    s = s.split("|")[0].strip()
-    s = re.split(r"\s+[Ww]ith\s+", s, maxsplit=1)[0].strip()
-    s = re.split(r"\s+[—–]\s+", s, maxsplit=1)[0].strip()
-    s = re.sub(r"\s+", " ", s)
-    return s
+
+    name = str(name).strip()
+
+    name = name.split("|")[0]
+    name = re.split(r"\s+[Ww]ith\s+", name)[0]
+    name = re.split(r"\s+[—–]\s+", name)[0]
+
+    return re.sub(r"\s+", " ", name).strip()
 
 
 # ── price parsing ────────────────────────────────────────────────
 
-def parse_price(value) -> int | None:
-    """Turn any price string into an integer NPR value, or None."""
-    if value is None or (isinstance(value, float) and pd.isna(value)):
-        return None
-    if isinstance(value, (int, float)):
-        return int(value)
-
-    text = str(value).strip()
-    if not text:
+def parse_price(value):
+    if pd.isna(value):
         return None
 
-    lowered = text.lower()
-    if any(w in lowered for w in ("not listed", "coming soon", "tbd", "n/a")):
-        return None
+    digits = re.sub(r"[^\d]", "", str(value))
 
-    digits = re.sub(r"[^\d]", "", text)
-    if not digits:
-        return None
-
-    try:
-        return int(digits)
-    except ValueError:
-        return None
+    return int(digits) if digits else None
 
 
 # ── brand helpers ────────────────────────────────────────────────
 
-def normalize_brand(value) -> str:
-    """Return a canonical brand name, or '' if unknown/empty/NaN."""
-    if value is None or (isinstance(value, float) and pd.isna(value)):
+def normalize_brand(value):
+    if pd.isna(value):
         return ""
-    text = str(value).strip()
-    if not text:
-        return ""
-    key = text.lower()
-    return BRAND_MAP.get(key, key.title())
+
+    value = str(value).strip().lower()
+
+    return BRAND_MAP.get(value, value.title())
 
 
-def derive_brand_from_name(name) -> str:
-    """Guess brand from the first word of a product name."""
-    if name is None or (isinstance(name, float) and pd.isna(name)):
+def derive_brand_from_name(name):
+    if pd.isna(name):
         return ""
-    text = str(name).strip()
-    if not text:
-        return ""
-    first = text.split()[0]
-    key = first.lower().rstrip(".,")
-    return BRAND_MAP.get(key, normalize_brand(first))
+
+    first = str(name).split()[0]
+
+    return BRAND_MAP.get(
+        first.lower().rstrip(".,"),
+        first.title()
+    )
 
 
 # ── main pipeline ────────────────────────────────────────────────
@@ -149,15 +130,21 @@ def transform() -> pd.DataFrame:
     ).astype(str)
 
     # ── 7. final columns (no status!) ────────────────────────────
-    out = df[[
-        "source",
-        "name",
-        "brand_clean",
-        "price",
-        "price_category",
-        "url",
-        "scraped_at",
-    ]].rename(columns={"brand_clean": "brand"})
+    out = df[
+        [
+            "source",
+            "name",
+            "brand_clean",
+            "price",
+            "price_category",
+            "url",
+            "scraped_at",
+        ]
+    ]
+    out.rename(
+        columns={"brand_clean": "brand"},
+        inplace=True
+    )
 
     # ── 8. dedupe ────────────────────────────────────────────────
     before = len(out)
