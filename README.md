@@ -1,10 +1,20 @@
 # Nepal Mobile Price Tracker
 
-A daily ETL pipeline that scrapes mobile phone prices from two Nepali e-commerce sites, cleans and loads them into PostgreSQL, tracks historical price changes, and generates reports — all orchestrated with Apache Airflow.
+[![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
+[![Airflow](https://img.shields.io/badge/Airflow-2.9.3-017CEE.svg)](https://airflow.apache.org/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-336791.svg)](https://www.postgresql.org/)
+[![Docker](https://img.shields.io/badge/Docker-Compose-2496ED.svg)](https://docs.docker.com/compose/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
+A daily ETL pipeline that scrapes mobile phone prices from two Nepali
+e-commerce sites, cleans and loads them into PostgreSQL, tracks historical
+price changes, and generates reports — all orchestrated with Apache Airflow.
+
+---
 
 ## What it does
 
-Every day at 06:00 UTC (11:45 AM NPT):
+Every day at **06:00 UTC (11:45 AM NPT)**:
 
 1. **Extract** — scrapes ~830 phone listings from NepalTechHub and Fatafat Sewa
 2. **Transform** — cleans names, parses prices to integers, normalizes brands
@@ -12,48 +22,64 @@ Every day at 06:00 UTC (11:45 AM NPT):
 4. **Snapshot** — copies today's state into `price_history` for trend analysis
 5. **Report** — writes daily price drops and rises to CSV
 
+---
+
 ## Architecture
 
 ```text
 ┌─────────────────────┐
-│     NepalTechHub     │  requests + BeautifulSoup
-│  (server-rendered)   │
-└──────────┬───────────┘
+│    NepalTechHub     │  requests + BeautifulSoup
+│  (server-rendered)  │
+└──────────┬──────────┘
            │
            ▼
 ┌─────────────────────┐
-│     Fatafat Sewa     │  Playwright (client-side pagination)
-│    (Next.js SPA)     │
-└──────────┬───────────┘
+│    Fatafat Sewa     │  Playwright (client-side pagination)
+│    (Next.js SPA)    │
+└──────────┬──────────┘
            │
            ▼
 ┌─────────────────────┐
-│      extract.py      │  → data/raw/phones.csv
-└──────────┬───────────┘
+│     extract.py      │  → data/raw/phones.csv
+└──────────┬──────────┘
            │
            ▼
 ┌─────────────────────┐
-│     transform.py     │  → data/processed/phones_clean.csv
-└──────────┬───────────┘
+│    transform.py     │  → data/processed/phones_clean.csv
+└──────────┬──────────┘
            │
            ▼
 ┌─────────────────────┐
-│       load.py        │  → mobile_prices table
-└──────────┬───────────┘
+│      load.py        │  → mobile_prices table
+└──────────┬──────────┘
            │
            ▼
 ┌─────────────────────┐
-│     snapshot.py      │  → price_history table
-└──────────┬───────────┘
+│    snapshot.py      │  → price_history table
+└──────────┬──────────┘
            │
            ▼
 ┌─────────────────────┐
-│      report.py       │  → reports/price_drops.csv
+│     report.py       │  → reports/price_drops.csv
 └─────────────────────┘
 
 All 5 steps orchestrated by Airflow
-(5-task DAG, retries=2, schedule=0 6 * * *)
+(dag_id: mobile_price_tracker · retries=2 · schedule="0 6 * * *")
 ```
+
+---
+
+## Screenshots
+
+**Airflow DAG — all 5 tasks green:**
+
+![Airflow DAG](screenshots/airflow-dag.png)
+
+**Sample query — phone count and price range by brand:**
+
+![DB query](screenshots/db-query.png)
+
+---
 
 ## Tech stack
 
@@ -66,12 +92,58 @@ All 5 steps orchestrated by Airflow
 | Orchestration | Apache Airflow 2.9.3 | Scheduling, retries, logs, UI |
 | Packaging | Docker + Compose | Reproducible environment |
 
+---
+
+## Quick start
+
+### 1. Clone and configure
+
+```bash
+git clone https://github.com/AcharyaPratik/mobile-price-tracker.git
+cd mobile-price-tracker
+cp .env.example .env
+# Optional: set AIRFLOW_UID to your host UID (id -u) to avoid root-owned logs
+```
+
+### 2. Spin up the stack
+
+```bash
+docker compose up -d --build
+```
+
+This starts PostgreSQL, the Airflow webserver, and the Airflow scheduler.
+Airflow auto-imports the DAG from `dags/mobile_pipeline.py`.
+
+First build takes ~5–7 min (Playwright downloads Chromium). Subsequent builds
+are cached.
+
+### 3. Open Airflow
+
+- URL: http://localhost:8080
+- Username: `admin`
+- Password: `admin`
+
+Toggle the `mobile_price_tracker` DAG **on**, then trigger a manual run to
+populate the database immediately (otherwise it waits until 06:00 UTC).
+
+### 4. (Optional) Run the pipeline manually without Airflow
+
+```bash
+python scripts/extract.py
+python scripts/transform.py
+python scripts/load.py
+python scripts/snapshot.py
+python scripts/report.py
+```
+
+---
+
 ## Project structure
 
 ```text
 mobile-price-tracker/
 ├── dags/
-│   └── mobile_pipeline.py      # 5-task Airflow DAG
+│   └── mobile_pipeline.py      # Airflow DAG (dag_id: mobile_price_tracker)
 ├── scripts/
 │   ├── extract.py              # Orchestrator: runs every source
 │   ├── transform.py            # Clean + normalize
@@ -88,21 +160,15 @@ mobile-price-tracker/
 │   ├── raw/                    # phones.csv (post-extract)
 │   └── processed/              # phones_clean.csv (post-transform)
 ├── reports/                    # Generated CSVs
+├── screenshots/                # README images
 ├── Dockerfile
 ├── docker-compose.yml
 ├── requirements.txt
+├── .env.example
 └── README.md
 ```
 
-## Screenshots
-
-**Airflow DAG — all 5 tasks green:**
-
-![Airflow DAG](screenshots/airflow-dag.png)
-
-**Sample query — phone count and price range by brand:**
-
-![DB query](screenshots/db-query.png)
+---
 
 ## Data model
 
@@ -131,9 +197,11 @@ Unique index on `(source, url)` — re-running the loader is idempotent.
 | snapshot_date | date | one row per phone per day |
 | captured_at | timestamp | insertion time |
 
+---
+
 ## Example queries
 
-Cheapest phones per brand:
+**Cheapest phones per brand:**
 
 ```sql
 SELECT DISTINCT ON (brand) brand, name, price
@@ -141,7 +209,7 @@ FROM mobile_prices
 ORDER BY brand, price ASC;
 ```
 
-Average price by brand:
+**Average price by brand:**
 
 ```sql
 SELECT brand,
@@ -152,7 +220,7 @@ GROUP BY brand
 ORDER BY avg_price DESC;
 ```
 
-Biggest price drops today:
+**Biggest price drops today:**
 
 ```sql
 WITH today AS (
@@ -172,3 +240,20 @@ WHERE t.price < y.price
 ORDER BY change ASC
 LIMIT 10;
 ```
+
+More queries in [`sql/analytics.sql`](sql/analytics.sql).
+
+---
+
+## Disclaimer
+
+This project is built for **educational purposes** to demonstrate an
+end-to-end ETL pipeline. Product names, prices, and images belong to their
+respective owners. Data is scraped from publicly available pages and is not
+redistributed.
+
+---
+
+## License
+
+Released under the [MIT License](LICENSE).
