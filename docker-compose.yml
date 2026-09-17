@@ -9,14 +9,17 @@ x-airflow-common: &airflow-common
     AIRFLOW__CORE__LOAD_EXAMPLES: "false"
     AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "false"
 
-    # Airflow metadata DB — uses the same Postgres service as the tracker DB
-    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${DB_USER}:${DB_PASSWORD}@postgres:5432/airflow
+    # These three tell Airflow's getpass.getuser() what to return,
+    # so it doesn't need a matching /etc/passwd entry for UID 1000.
+    USER: airflow
+    LOGNAME: airflow
+    HOME: /home/airflow
 
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${DB_USER}:${DB_PASSWORD}@postgres:5432/airflow
     AIRFLOW__WEBSERVER__SECRET_KEY: "dev-shared-secret-key-please-change"
     AIRFLOW__WEBSERVER__WORKERS: "2"
     AIRFLOW__LOGGING__LOGGING_LEVEL: "INFO"
 
-    # Override host-side .env values — inside Docker the service is `postgres:5432`
     DB_HOST: postgres
     DB_PORT: "5432"
     DB_NAME: ${DB_NAME}
@@ -56,13 +59,14 @@ services:
       timeout: 5s
       retries: 10
 
-  airflow-init:
+    airflow-init:
     <<: *airflow-common
     container_name: airflow-init
-    entrypoint: /bin/bash
     command:
+      - bash
       - -c
       - |
+        set -e
         airflow db migrate
         airflow users create \
           --username admin --password admin \
