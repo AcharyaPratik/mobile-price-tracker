@@ -63,7 +63,12 @@ def parse_price(value):
 
     digits = re.sub(r"[^\d]", "", str(value))
 
-    return int(digits) if digits else None
+    if not digits:
+        return None
+
+    price = int(digits)
+    
+    return price if price >= 1000 else None
 
 
 # ── brand helpers ────────────────────────────────────────────────
