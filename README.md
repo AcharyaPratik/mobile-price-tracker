@@ -75,10 +75,6 @@ All 5 steps orchestrated by Airflow
 
 ![Airflow DAG](screenshots/airflow-dag.png)
 
-**Sample query — phone count and price range by brand:**
-
-![DB query](screenshots/db-query.png)
-
 ---
 
 ## Tech stack
