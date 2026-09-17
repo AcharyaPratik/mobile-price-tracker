@@ -1,7 +1,6 @@
 \c mobile_tracker
 
 DROP TABLE IF EXISTS mobile_prices CASCADE;
-DROP TABLE IF EXISTS price_history CASCADE;
 
 CREATE TABLE mobile_prices (
     id              SERIAL PRIMARY KEY,
@@ -22,7 +21,7 @@ CREATE INDEX idx_mobile_prices_brand   ON mobile_prices (brand);
 CREATE INDEX idx_mobile_prices_price   ON mobile_prices (price);
 
 -- ── historical snapshots ──────────────────────────────────────
-CREATE TABLE price_history (
+CREATE TABLE IF NOT EXISTS price_history (
     id              BIGSERIAL PRIMARY KEY,
     source          VARCHAR(50)    NOT NULL,
     url             TEXT           NOT NULL,

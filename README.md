@@ -94,6 +94,16 @@ mobile-price-tracker/
 └── README.md
 ```
 
+## Screenshots
+
+**Airflow DAG — all 5 tasks green:**
+
+![Airflow DAG](screenshots/airflow-dag.png)
+
+**Sample query — phone count and price range by brand:**
+
+![DB query](screenshots/db-query.png)
+
 ## Data model
 
 **`mobile_prices`** — current state of every phone
