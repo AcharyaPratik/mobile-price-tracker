@@ -1,3 +1,5 @@
+\c mobile_tracker
+
 DROP TABLE IF EXISTS mobile_prices CASCADE;
 DROP TABLE IF EXISTS price_history CASCADE;
 
